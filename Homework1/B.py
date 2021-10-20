@@ -1,6 +1,6 @@
 
 from Cryptodome.Cipher import AES
-
+from Crypto.Util.strxor import strxor
 import socket
 
 
@@ -20,23 +20,29 @@ def receivefromA(conn):
     Key = decipher.decrypt(Key) #decripteaza cheia primita de la A cu cheia K'
     conn.send('Success'.encode('utf-8')) #ii trimite lui A mesajul de incepere a comunicarii
 
-
-
+    cipher = AES.new(Key, AES.MODE_ECB)
+    ciphertext = initializationVector
     block=conn.recv(16)
-    plain=""
+    plain=b""
     while block:
 
         if opMode == 'ECB':
-            cipher = AES.new(Key, AES.MODE_ECB)
-            plain=plain+cipher.decrypt(block).decode('utf-8')
+            block = cipher.decrypt(block)
+            plain = plain + block
+            # cipher = AES.new(Key, AES.MODE_ECB)
+            # plain=plain+cipher.decrypt(block).decode('utf-8')
 
 
-        else:
-            cipher = AES.new(Key, AES.MODE_CFB, initializationVector)
-            plain = plain + cipher.decrypt(block).decode('utf-8')
+        elif opMode == 'CFB':
+            #CFB
+            plain = plain +  strxor(cipher.encrypt(ciphertext), block)
+            ciphertext = block
+            # cipher = AES.new(Key, AES.MODE_CFB, initializationVector)  #se face xor dintre blocul primit de la A si ciphertext
+            # plain = plain + cipher.decrypt(block).decode('utf-8')                      #care initial este vectorul de init
 
         block = conn.recv(16)
-    print(plain)
+    print(plain.decode("utf-8"))
+    # print(plain)
 
 def start():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
