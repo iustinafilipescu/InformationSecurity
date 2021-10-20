@@ -1,6 +1,6 @@
 from Cryptodome.Cipher import AES
 from Cryptodome.Util.Padding import pad
-
+from Crypto.Util.strxor import strxor
 import socket
 
 
@@ -50,19 +50,33 @@ def sendtoB(K, opMode):
     #luam cate 16 bytes
     block=f.read(16)
 
+    ciphertext = initializationVector
+    cipher = AES.new(Key, AES.MODE_ECB)
     while block:
         block = block.encode()
-
+        if len(block) < 16:  # adaugam padding daca lungimea blocului de text este sub 16
+            block = pad(block, 16)
 
         if opMode == "ECB":
-            if len(block) < 16:  # adaugam padding daca lungimea blocului de text este sub 16
-                block = pad(block, 16)
-            cipher = AES.new(Key, AES.MODE_ECB)  # cipher AES pentru a cripta folosind ECB mode
-            B.send(cipher.encrypt(block)) #crpitam folosind ECB
+            # ECB - Criptarea constă în procesarea independentă a fiecărui bloc de 128de biţi cu aceeaşi cheie de criptare.
+            B.send(cipher.encrypt(block))  # crpitam folosind ECB
+
+            # if len(block) < 16:  # adaugam padding daca lungimea blocului de text este sub 16
+            #     block = pad(block, 16)
+            # cipher = AES.new(Key, AES.MODE_ECB)  # cipher AES pentru a cripta folosind ECB mode
+            # B.send(cipher.encrypt(block))
+
         elif opMode=='CFB':
-            cipher = AES.new(Key, AES.MODE_CFB, initializationVector)  # cipher AES pentru a cripta folosind CFB mode
-            #pentru CFB trebuie sa adaugam si vectorul de initializare
-            B.send(cipher.encrypt(block))
+            # Modul de operare CFB  cripteaza blocul #ciphertext obtinut la pasul precedent (si nu blocul de plaintext) obtinandu-se un asa zis "flux de cheie" #(keystream),
+            # care la randul lui este supus unui XOR cu blocul curent de criptat obtinandu-se #ciphertextul urmator.
+            # Primul pas de criptare se face apeland din nou la un vector initial.
+
+            ciphertext = strxor(cipher.encrypt(ciphertext), block)
+            B.send(ciphertext)
+
+            # pentru CFB trebuie sa adaugam si vectorul de initializare
+            # cipher = AES.new(Key, AES.MODE_CFB, initializationVector)  # cipher AES pentru a cripta folosind CFB mode
+            # B.send(cipher.encrypt(block))
 
         block = f.read(16) #preluam urmatorii 16 bytes
 
